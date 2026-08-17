@@ -59,10 +59,10 @@ def toggle_all_mics():
         print(f"Failed to toggle microphones: {e}")
 
 # Bind your chosen key combination here
-hotkey = 'ctrl+shift+m'
+hotkey = 'a+f+k'
 keyboard.add_hotkey(hotkey, toggle_all_mics)
 
 print(f"App is running! Press {hotkey.upper()} to toggle ALL mics. Press ESC to exit.")
 
-# Keeps the application running in the background until you press Escape
-keyboard.wait('esc')
+# Now requires a very deliberate combination to close the background app
+keyboard.wait('q+u+i+t')
