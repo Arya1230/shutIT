@@ -1,61 +1,93 @@
+import keyboard
+import pystray
+from PIL import Image, ImageDraw
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL, CoInitialize, CoCreateInstance, CLSCTX_INPROC_SERVER
 from pycaw.pycaw import IAudioEndpointVolume
 from pycaw.constants import CLSID_MMDeviceEnumerator
 from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
-import keyboard
 
-def toggle_all_mics():
+# Global variable to hold our tray icon
+tray_icon = None
+
+def create_image(is_muted):
+    """Draws a simple 64x64 icon. Red if muted, Green if live."""
+    width = 64
+    height = 64
+    color = "red" if is_muted else "green"
+    
+    # Create a solid color square
+    image = Image.new('RGB', (width, height), color)
+    draw = ImageDraw.Draw(image)
+    
+    # Draw a slightly darker border for visibility
+    border_color = "darkred" if is_muted else "darkgreen"
+    draw.rectangle((0, 0, width-1, height-1), outline=border_color, width=4)
+    
+    return image
+
+def toggle_all_mics(*args):
+    """Toggles the mics and updates the UI. 
+    Accepts *args because the tray menu and keyboard pass different arguments."""
+    global tray_icon
     try:
-        # Initialize COM for the background thread
         CoInitialize()
-        
-        # Access the core Windows Device Enumerator directly
         deviceEnumerator = CoCreateInstance(
             CLSID_MMDeviceEnumerator,
             IMMDeviceEnumerator,
             CLSCTX_INPROC_SERVER)
         
-        # EnumAudioEndpoints arguments: 
-        # 1 = eCapture (Input devices/Microphones)
-        # 1 = DEVICE_STATE_ACTIVE (Only currently active/plugged-in devices)
         collection = deviceEnumerator.EnumAudioEndpoints(1, 1)
         count = collection.GetCount()
         
         if count == 0:
-            print("No active microphones found.")
             return
             
         mic_volumes = []
-        
-        # Loop through all active microphones and get their volume controls
         for i in range(count):
             dev = collection.Item(i)
             interface = dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
             volume = cast(interface, POINTER(IAudioEndpointVolume))
             mic_volumes.append(volume)
         
-        # Smart Toggle Logic:
-        # If AT LEAST ONE microphone is currently unmuted, mute them ALL.
-        # If ALL microphones are already muted, unmute them ALL.
+        # Check current state and toggle
         is_any_unmuted = any(not vol.GetMute() for vol in mic_volumes)
         target_mute_state = True if is_any_unmuted else False
         
-        # Apply the exact same state to every connected microphone
         for vol in mic_volumes:
             vol.SetMute(target_mute_state, None)
             
-        state = "Muted" if target_mute_state else "Unmuted"
-        print(f"All microphones ({count} devices) are now {state}")
-        
+        # --- UI UPDATE ---
+        if tray_icon is not None:
+            tray_icon.icon = create_image(target_mute_state)
+            tray_icon.title = "Mic: MUTED" if target_mute_state else "Mic: LIVE"
+            
     except Exception as e:
         print(f"Failed to toggle microphones: {e}")
 
-# Bind your chosen key combination here
+def quit_app(icon, item):
+    """Stops the tray icon loop and exits the script."""
+    icon.stop()
+
+# --- Application Startup ---
+
+# 1. Bind the hotkey
 hotkey = 'a+f+k'
 keyboard.add_hotkey(hotkey, toggle_all_mics)
 
-print(f"App is running! Press {hotkey.upper()} to toggle ALL mics. Press ESC to exit.")
+# 2. Setup the Tray Menu
+menu = pystray.Menu(
+    pystray.MenuItem("Toggle Mute", toggle_all_mics),
+    pystray.MenuItem("Exit App", quit_app)
+)
 
-# Now requires a very deliberate combination to close the background app
-keyboard.wait('q+u+i+t')
+# 3. Create the Icon (Starts assuming unmuted/green)
+tray_icon = pystray.Icon(
+    "MicMuter", 
+    create_image(is_muted=False), 
+    title="Mic: LIVE", 
+    menu=menu
+)
+
+# 4. Run the Tray App (This keeps the program running permanently until 'Exit App' is clicked)
+tray_icon.run()
