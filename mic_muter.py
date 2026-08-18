@@ -1,16 +1,9 @@
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL, CoInitialize, CoCreateInstance, CLSCTX_INPROC_SERVER
 from pycaw.pycaw import IAudioEndpointVolume
+from pycaw.constants import CLSID_MMDeviceEnumerator
+from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
 import keyboard
-
-# Smart import to handle both new and old versions of the pycaw library
-try:
-    from pycaw.constants import CLSID_MMDeviceEnumerator
-    from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
-except ImportError:
-    import pycaw.utils
-    CLSID_MMDeviceEnumerator = pycaw.utils.CLSID_MMDeviceEnumerator
-    IMMDeviceEnumerator = pycaw.utils.IMMDeviceEnumerator
 
 def toggle_all_mics():
     try:
