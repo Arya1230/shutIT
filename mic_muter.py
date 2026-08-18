@@ -6,9 +6,47 @@ from comtypes import CLSCTX_ALL, CoInitialize, CoCreateInstance, CLSCTX_INPROC_S
 from pycaw.pycaw import IAudioEndpointVolume
 from pycaw.constants import CLSID_MMDeviceEnumerator
 from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
+import winreg
+import sys
+import os
 
 # Global variable to hold our tray icon
 tray_icon = None
+
+# Windows Registry details for startup
+REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
+APP_NAME = "MicMuterApp"
+
+def is_startup_enabled():
+    """Checks the registry to see if the app is set to run on startup."""
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
+        winreg.QueryValueEx(registry_key, APP_NAME)
+        winreg.CloseKey(registry_key)
+        return True
+    except FileNotFoundError:
+        return False
+    except Exception:
+        return False
+
+def toggle_startup(icon, item):
+    """Adds or removes the app from the Windows startup registry."""
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_SET_VALUE)
+        
+        if is_startup_enabled():
+            # It's currently enabled, so remove it
+            winreg.DeleteValue(registry_key, APP_NAME)
+        else:
+            # It's currently disabled, so add it
+            # sys.executable automatically points to the .exe file when packaged with PyInstaller
+            exe_path = f'"{sys.executable}"' 
+            winreg.SetValueEx(registry_key, APP_NAME, 0, winreg.REG_SZ, exe_path)
+            
+        winreg.CloseKey(registry_key)
+    except Exception as e:
+        print(f"Failed to toggle startup: {e}")
+
 
 def create_image(is_muted):
     """Draws a simple 64x64 icon. Red if muted, Green if live."""
@@ -27,8 +65,7 @@ def create_image(is_muted):
     return image
 
 def toggle_all_mics(*args):
-    """Toggles the mics and updates the UI. 
-    Accepts *args because the tray menu and keyboard pass different arguments."""
+    """Toggles the mics and updates the UI."""
     global tray_icon
     try:
         CoInitialize()
@@ -75,13 +112,18 @@ def quit_app(icon, item):
 hotkey = 'a+f+k'
 keyboard.add_hotkey(hotkey, toggle_all_mics)
 
-# 2. Setup the Tray Menu
+# 2. Setup the Tray Menu (Now with Startup Toggle!)
 menu = pystray.Menu(
     pystray.MenuItem("Toggle Mute", toggle_all_mics),
+    pystray.MenuItem(
+        "Run on Startup", 
+        toggle_startup, 
+        checked=lambda item: is_startup_enabled()
+    ),
     pystray.MenuItem("Exit App", quit_app)
 )
 
-# 3. Create the Icon (Starts assuming unmuted/green)
+# 3. Create the Icon
 tray_icon = pystray.Icon(
     "MicMuter", 
     create_image(is_muted=False), 
@@ -89,5 +131,5 @@ tray_icon = pystray.Icon(
     menu=menu
 )
 
-# 4. Run the Tray App (This keeps the program running permanently until 'Exit App' is clicked)
+# 4. Run the Tray App
 tray_icon.run()
