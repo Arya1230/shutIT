@@ -9,6 +9,8 @@ from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
 import winreg
 import sys
 import os
+import winsound
+import threading
 
 # Global variable to hold our tray icon
 tray_icon = None
@@ -94,6 +96,14 @@ def toggle_all_mics(*args):
         for vol in mic_volumes:
             vol.SetMute(target_mute_state, None)
             
+        # Play sound asynchronously to avoid blocking the hotkey thread
+        def play_sound():
+            if target_mute_state:
+                winsound.Beep(400, 150)  # Lower pitch for muted
+            else:
+                winsound.Beep(800, 150)  # Higher pitch for live
+        threading.Thread(target=play_sound, daemon=True).start()
+            
         # --- UI UPDATE ---
         if tray_icon is not None:
             tray_icon.icon = create_image(target_mute_state)
@@ -101,6 +111,31 @@ def toggle_all_mics(*args):
             
     except Exception as e:
         print(f"Failed to toggle microphones: {e}")
+def get_current_mute_state():
+    """Returns True if all mics are muted, False if any mic is unmuted."""
+    try:
+        CoInitialize()
+        deviceEnumerator = CoCreateInstance(
+            CLSID_MMDeviceEnumerator,
+            IMMDeviceEnumerator,
+            CLSCTX_INPROC_SERVER)
+        
+        collection = deviceEnumerator.EnumAudioEndpoints(1, 1)
+        count = collection.GetCount()
+        
+        if count == 0:
+            return False
+            
+        for i in range(count):
+            dev = collection.Item(i)
+            interface = dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            volume = cast(interface, POINTER(IAudioEndpointVolume))
+            if not volume.GetMute():
+                return False
+        return True
+    except Exception as e:
+        print(f"Failed to get mute state: {e}")
+        return False
 
 def quit_app(icon, item):
     """Stops the tray icon loop and exits the script."""
@@ -109,7 +144,7 @@ def quit_app(icon, item):
 # --- Application Startup ---
 
 # 1. Bind the hotkey
-hotkey = 'a+f+k'
+hotkey = 'right ctrl+right shift'
 keyboard.add_hotkey(hotkey, toggle_all_mics)
 
 # 2. Setup the Tray Menu (Now with Startup Toggle!)
@@ -124,10 +159,11 @@ menu = pystray.Menu(
 )
 
 # 3. Create the Icon
+initial_mute_state = get_current_mute_state()
 tray_icon = pystray.Icon(
     "MicMuter", 
-    create_image(is_muted=False), 
-    title="Mic: LIVE", 
+    create_image(is_muted=initial_mute_state), 
+    title="Mic: MUTED" if initial_mute_state else "Mic: LIVE", 
     menu=menu
 )
 

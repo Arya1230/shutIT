@@ -1,0 +1,2 @@
+pyinstaller --onefile --noconsole mic_muter.py
+
