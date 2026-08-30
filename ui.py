@@ -1,4 +1,4 @@
-﻿"""
+"""
 ui.py - shutIT — Glassmorphism dark, smooth circle icon, pulse ring, animated toggle.
 """
 
@@ -323,7 +323,7 @@ class App(tk.Tk):
         self._anim_color(old, new)
         self._update_tray(muted)
 
-    def _status_text(self): return "MUTED" if self._muted else "LIVE"
+    def _status_text(self): return "MUTED" if self._muted else "UNMUTED"
     def _toggle_startup(self): mic_logic.set_startup(self._startup_var.get())
 
     def _quit(self, *_):
