@@ -1,2 +1,5 @@
-pyinstaller --onefile --noconsole mic_muter.py
+﻿# Build GUI app (no console window)
+pyinstaller --onefile --noconsole --name shutIT main.py
 
+# Old tray-only build
+# pyinstaller --onefile --noconsole mic_muter.py
