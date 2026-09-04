@@ -1,11 +1,11 @@
-﻿# Core
+# Core
 keyboard==0.13.5
 pycaw==20251023
 comtypes==1.4.16
 
 # Tray icon
-pystray
-Pillow
+pystray==0.19.5
+Pillow==12.3.0
 
 # Packaging
 pyinstaller==6.22.1
